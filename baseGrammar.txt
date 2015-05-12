@@ -227,8 +227,7 @@ AssignmentExpression
       };
     }
   / LogicalORExpression
-
-
+  
 Expression
   = first:AssignmentExpression rest:(__ "," __ AssignmentExpression)* {
       return rest.length > 0
@@ -286,7 +285,7 @@ ExpressionStatement
     }
 
 EmptyStatement
-  = ";" { return { type: "EmptyStatement" }; }	
+  = ";"
 	
 IfStatement
   = IfToken __ "(" __ test:Expression __ ")" __

@@ -21,8 +21,6 @@ pakartotinis cool(kintamasis) {
 	grazink "coolstuff " + kintamasis;
 }
 
-tekstas yo = cool("test");
-
 sk minus = 90 - 50;
 sk plus = 10 + 20;
 sk multiply = 5*5;
