@@ -1,0 +1,29 @@
+sk x = 12;
+tekstas y = "test";
+
+kol(x < 4) {
+  x = x * 2;
+}
+
+jeigu (x > 10) {
+	y = "t1";
+} arba {
+	y = "t2";
+}
+
+jeigu (10 == 10) {
+}
+
+jeigu (x != 10) {
+}
+
+pakartotinis cool(kintamasis) {	
+	grazink "coolstuff " + kintamasis;
+}
+
+tekstas yo = cool("test");
+
+sk minus = 90 - 50;
+sk plus = 10 + 20;
+sk multiply = 5*5;
+sk divide = 10/10;

@@ -1,0 +1,381 @@
+{
+  function extractOptional(optional, index) {
+    return optional ? optional[index] : null;
+  }
+
+  function extractList(list, index) {
+    var result = new Array(list.length), i;
+
+    for (i = 0; i < list.length; i++) {
+      result[i] = list[i][index];
+    }
+
+    return result;
+  }
+
+  function buildList(first, rest, index) {
+    return [first].concat(extractList(rest, index));
+  }
+
+  function buildTree(first, rest, builder) {
+    var result = first, i;
+
+    for (i = 0; i < rest.length; i++) {
+      result = builder(result, rest[i]);
+    }
+
+    return result;
+  }
+
+  function buildBinaryExpression(first, rest) {
+    return buildTree(first, rest, function(result, element) {
+      return {
+        type:     "BinaryExpression",
+        operator: element[1],
+        left:     result,
+        right:    element[3]
+      };
+    });
+  }
+
+  function optionalList(value) {
+    return value !== null ? value : [];
+  }
+}
+
+Start
+  = __ program:Program __ { return program; }
+
+SourceCharacter
+  = .
+
+WhiteSpace "whitespace"
+  = "\t"
+  / "\v"
+  / "\f"
+  / " "
+
+LineTerminator
+  = [\n\r]
+
+LineTerminatorSequence "end of line"
+  = "\n"
+  / "\r\n"
+  / "\r"
+
+Identifier
+  = !Keyword name:IdentifierName { return name; }
+
+IdentifierName "identifier"
+  = first:Letter rest:[a-zA-Z0-9]* {
+      return {
+        type: "Identifier",
+        name: first + rest.join("")
+      };
+    }
+
+Letter
+  = [a-zA-Z]
+
+Keyword
+  = ElseToken
+  / FunctionToken
+  / IfToken
+  / ReturnToken
+  / VarToken
+  / WhileToken
+
+Literal
+  = NumericLiteral
+  / StringLiteral
+
+
+NumericLiteral "number"
+  = literal:DecimalLiteral {
+		return {
+			type: "Literal",
+			value: parseInt(literal.join(""))
+		}	  
+    }
+
+DecimalLiteral
+  = DecimalDigit+
+
+DecimalDigit
+  = [0-9]
+
+StringLiteral "string"
+  = '"' chars:DoubleStringCharacter* '"' {
+      return { type: "Literal", value: chars.join("") };
+    }
+  / "'" chars:SingleStringCharacter* "'" {
+      return { type: "Literal", value: chars.join("") };
+    }
+
+DoubleStringCharacter
+  = !('"' / LineTerminator) SourceCharacter { return text(); }
+
+SingleStringCharacter
+  = !("'" / LineTerminator) SourceCharacter { return text(); }
+
+/* Tokens */
+
+ElseToken       = "arba"       				!Letter 
+FunctionToken   = "pakartotinis"   			!Letter 
+IfToken         = "jeigu"         			!Letter 
+ReturnToken     = "grazink"    				!Letter  
+VarToken        = "sk"  / "tekstas"    		!Letter  
+WhileToken      = "kol"      			    !Letter 
+
+__
+  = (WhiteSpace / LineTerminatorSequence)*
+
+_
+  = (WhiteSpace)*
+
+EOS
+  = __ ";"
+  / _ LineTerminatorSequence
+  / _ &"}"
+  / __ EOF
+
+EOF
+  = !.
+
+PrimaryExpression
+  = Identifier
+  / Literal
+  / "(" __ expression:Expression __ ")" { return expression; }
+
+Arguments
+  = "(" __ args:(ArgumentList __)? ")" {
+      return optionalList(extractOptional(args, 0));
+    }
+
+ArgumentList
+  = first:AssignmentExpression rest:(__ "," __ AssignmentExpression)* {
+      return buildList(first, rest, 3);
+    }
+
+LeftHandSideExpression
+  = PrimaryExpression
+
+MultiplicativeExpression
+  = first:LeftHandSideExpression
+    rest:(__ MultiplicativeOperator __ LeftHandSideExpression)*
+    { return buildBinaryExpression(first, rest); }
+
+MultiplicativeOperator
+  = $("*" !"=")
+  / $("/" !"=")
+
+AdditiveExpression
+  = first:MultiplicativeExpression
+    rest:(__ AdditiveOperator __ MultiplicativeExpression)*
+    { return buildBinaryExpression(first, rest); }
+
+AdditiveOperator
+  = $("+" ![+=])
+  / $("-" ![-=])
+
+RelationalExpression
+  = first:AdditiveExpression
+    rest:(__ RelationalOperator __ AdditiveExpression)*
+    { return buildBinaryExpression(first, rest); }
+
+RelationalOperator
+  = "<="
+  / ">="
+  / $("<" !"<")
+  / $(">" !">")
+
+EqualityExpression
+  = first:RelationalExpression
+    rest:(__ EqualityOperator __ RelationalExpression)*
+    { return buildBinaryExpression(first, rest); }
+
+EqualityOperator
+  = "=="
+  / "!="
+
+LogicalANDExpression
+  = first:EqualityExpression
+    rest:(__ LogicalANDOperator __ EqualityExpression)*
+    { return buildBinaryExpression(first, rest); }
+
+LogicalANDOperator
+  = "&&"
+
+LogicalORExpression
+  = first:LogicalANDExpression
+    rest:(__ LogicalOROperator __ LogicalANDExpression)*
+    { return buildBinaryExpression(first, rest); }
+
+LogicalOROperator
+  = "||"
+
+AssignmentExpression
+  = left:LeftHandSideExpression __
+    "=" !"=" __
+    right:AssignmentExpression
+    {
+      return {
+        type:     "AssignmentExpression",
+        operator: "=",
+        left:     left,
+        right:    right
+      };
+    }
+  / LogicalORExpression
+
+
+Expression
+  = first:AssignmentExpression rest:(__ "," __ AssignmentExpression)* {
+      return rest.length > 0
+        ? { type: "SequenceExpression", expressions: buildList(first, rest, 3) }
+        : first;
+    }
+
+Statement
+  = Block
+  / VariableStatement
+  / EmptyStatement
+  / ExpressionStatement
+  / IfStatement
+  / IterationStatement
+  / ReturnStatement
+
+Block
+  = "{" __ body:(StatementList __)? "}" {
+      return {
+        type: "BlockStatement",
+        body: optionalList(extractOptional(body, 0))
+      };
+    }
+
+StatementList
+  = first:Statement rest:(__ Statement)* { return buildList(first, rest, 1); }
+
+VariableStatement
+  = VarToken __ declarations:VariableDeclaration {
+      return {
+        type:         "VariableDeclaration",
+        declarations: [declarations],
+		kind: "var"
+      };
+    }
+
+VariableDeclaration
+  = id:Identifier init:(__ Initialiser)? {
+      return {
+        type: "VariableDeclarator",
+        id:   id,
+        init: extractOptional(init, 1)
+      };
+    }
+
+Initialiser
+  = "=" !"=" __ expression:AssignmentExpression { return expression; }
+
+ExpressionStatement
+  = !("{" / FunctionToken) expression:Expression EOS {
+      return {
+        type:       "ExpressionStatement",
+        expression: expression
+      };
+    }
+
+EmptyStatement
+  = ";" { return { type: "EmptyStatement" }; }	
+	
+IfStatement
+  = IfToken __ "(" __ test:Expression __ ")" __
+    consequent:Statement __
+    ElseToken __
+    alternate:Statement
+    {
+      return {
+        type:       "IfStatement",
+        test:       test,
+        consequent: consequent,
+        alternate:  alternate
+      };
+    }
+  / IfToken __ "(" __ test:Expression __ ")" __
+    consequent:Statement {
+      return {
+        type:       "IfStatement",
+        test:       test,
+        consequent: consequent,
+        alternate:  null
+      };
+    }
+
+IterationStatement
+  = WhileToken __ "(" __ test:Expression __ ")" __
+    body:Statement
+    { return { type: "WhileStatement", test: test, body: body }; }
+
+ReturnStatement
+  = ReturnToken EOS {
+      return { type: "ReturnStatement", argument: null };
+    }
+  / ReturnToken _ argument:Expression EOS {
+      return { type: "ReturnStatement", argument: argument };
+    }
+
+FunctionDeclaration
+  = FunctionToken __ id:Identifier __
+    "(" __ params:(FormalParameterList __)? ")" __
+    "{" __ body:FunctionBody __ "}"
+    {
+      return {
+        type:   "FunctionDeclaration",
+        id:     id,
+        params: optionalList(extractOptional(params, 0)),
+        body:   body
+      };
+    }
+
+FunctionExpression
+  = FunctionToken __ id:(Identifier __)?
+    "(" __ params:(FormalParameterList __)? ")" __
+    "{" __ body:FunctionBody __ "}"
+    {
+      return {
+        type:   "FunctionExpression",
+        id:     extractOptional(id, 0),
+        params: optionalList(extractOptional(params, 0)),
+        body:   body
+      };
+    }
+
+FormalParameterList
+  = first:Identifier rest:(__ "," __ Identifier)* {
+      return buildList(first, rest, 3);
+    }
+
+FunctionBody
+  = body:SourceElements? {
+      return {
+        type: "BlockStatement",
+        body: optionalList(body)
+      };
+    }
+
+Program
+  = body:SourceElements? {
+      return {
+        type: "Program",
+        body: optionalList(body)
+      };
+    }
+
+SourceElements
+  = first:SourceElement rest:(__ SourceElement)* {
+      return buildList(first, rest, 1);
+    }
+
+SourceElement
+  = Statement
+  / FunctionDeclaration
